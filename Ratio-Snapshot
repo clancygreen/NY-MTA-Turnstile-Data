@@ -16,7 +16,7 @@ version 11.2
 	*which are created by those DO files.
 
 *You will need master_remote_crosswalk.dta, which is a list of remote numbers with a business district indicator for each.
-*The .CSV is available at http://we.tl/dbqZLRF8Tb 
+*The .CSV is available in this GitHub folder. 
 *(It can be converted to DTA format with Stata.)
 	
 *The size of the complete data file is around 3 gigabytes. It is recommended to have at least 8 gig of memory.
