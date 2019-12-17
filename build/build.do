@@ -1,23 +1,17 @@
-****MTA TURNSTILE DATA PREP AND CLEANING****
+version 16.0
 
-*By Kevin McCaffrey, Ivan Khilko, and Maureen Ballard 
-*August 2014
 
-*Stata Version 11.2
-version 11.2
+do header.do
+
+XX 
 
 
 ***OVERALL INSTRUCTIONS***
+* Download Remote-Booth-Station.xls from http://web.mta.info/developers/resources/nyct/turnstile/Remote-Booth-Station.xls
+* Open in Excel, save as .csv, save it to working directory
+* Download all desired text-based data files from http://web.mta.info/developers/turnstile.html
+* Save in working directory (keep them as text files)
 
-*Download Remote-Booth-Station.xls from http://web.mta.info/developers/resources/nyct/turnstile/Remote-Booth-Station.xls
-	*Open in Excel, save as .csv, save it to working directory
-*Download all desired text-based data files from http://web.mta.info/developers/turnstile.html
-	*Save in working directory (keep them as text files)
-
-*The size of the complete data file is 3.5 - 4 gigabytes. It is recommended to have at least 8 gig of memory.
-
-*Set your working directory here, after the cd
-	*It is advisable for speed, given the size of the dataset to be built, that the working directory be on your local computer.
 cd 
 
 
