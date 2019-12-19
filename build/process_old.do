@@ -1,135 +1,79 @@
 version 16.0
 
-
 do header.do
 
-XX 
-
-
-***OVERALL INSTRUCTIONS***
-* Download Remote-Booth-Station.xls from http://web.mta.info/developers/resources/nyct/turnstile/Remote-Booth-Station.xls
-* Open in Excel, save as .csv, save it to working directory
-* Download all desired text-based data files from http://web.mta.info/developers/turnstile.html
-* Save in working directory (keep them as text files)
-
-cd 
-
-
-
-
-***DATASET BUILDING***
-
-
-	
-**THIS SECTION STANDARDIZES THE STATION NAMES IN THE STATION CROSSWALK
-	*It makes sure each remote only maps to one station.
-	*It combines station and line names to create unique station names for each line.
-	*It combines stations that are connected via walkways.
-
+**THIS SECTION CREATES THE MASTER DATASET FROM THE TEXT FILES FOR OLD FILE STRUCTURE
 clear
-insheet using Remote-Booth-Station.csv, names
-bysort remote: replace station = station[1]
-bysort remote: replace linename = linename[1]
-replace station = "14 ST-6 AVE" if remote == "R105"
-replace linename = "FLM123" if station == "14 ST-6 AVE"
-replace linename = "123ACE" if station =="34 ST-PENN STA"
-replace station = "42 ST-TIMES SQ" if station == "42 ST-PA BUS TE"
-replace linename = "ACENQRS1237" if station == "42 ST-TIMES SQ"
-replace station = "COURT SQ-23 ST" if remote == "R346"
-replace linename = "EMG7" if station == "COURT SQ-23 ST"
-replace linename = "ACJZ2345" if station == "FULTON ST" & remote == "R028"
-replace linename = "ACFR" if station == "JAY ST-METROTEC"
-replace station = "CITY HALL" if station == "MURRAY ST-B'WAY"
-replace linename = "EM6" if station == "51 ST"
-replace station = "LEXINGTON-53 ST" if station == "51 ST"
-replace station = "42 ST-BRYANT PK" if station == "5 AVE-BRYANT PK"
-replace linename = "BDFM7" if station == "42 ST-BRYANT PK"
-replace linename = "BDFQ6" if station == "BLEECKER ST"
-replace station = "BROADWAY/LAFAY" if station == "BLEECKER ST"
-replace linename = "2345S" if station == "BOTANIC GARDEN"
-replace station = "FRANKLIN AVE" if station == "BOTANIC GARDEN"
-gen station_line = station + "-" + linename
-
-drop station
-rename station_line station
-label variable station "Station"
-
-drop booth linename
-duplicates drop
-
-save station_crosswalk
 
 
-**THIS SECTION CREATES THE MASTER DATASET FROM THE TEXT FILES
-
-
-clear
-set more off
-local datafiles : dir . files  "*.txt"
+local datafiles : dir "$subway_oldtext_dir" files "*.txt"
+assert strlen(`" `datafiles' "') != 0
 
 *Loop through the raw data files
 foreach file in `datafiles' {
 
 	*Import the next file
+    di ""
 	display "Importing `file'"
-	insheet using `file', clear
 
-	*This is a special case that deals with extra text
-		*at the beginning of the 7/14/2012 data file
-	if "`file'" == "turnstile_120714.txt" {
-		display "Dropping the first ten observations"
-		drop in 1/10
-		destring v7 v8 v12 v13 v17 v18 v22 v23 v27 v28 v32 v33 v37 v38 v42 v43, replace
-	}
-	
-	*The end of the 8/25/2012 data file has an odd line at the end with "USE",
-		*whose formatting doesn't fit with the other lines. This deletes the last line.
-	if "`file'" == "turnstile_120825.txt" {
-		local obs_total = _N
-		display "Dropping the last observation"
-		drop in `obs_total'
-	}
-	
-	*In turnstile_120505.txt, there is one value of just a hyphen in v43
-		*This will make sure all of the entries and exits are numeric format,
-		*as long as there are no other characters besides hyphen in those fields.
-		*This has to be done before the stacking; otherwise, data is lost and set to missing.
-	destring v7 v8 v12 v13 v17 v18 v22 v23 v27 v28 v32 v33 v37 v38 v42 v43, replace ignore("-")
-	
-	*Organize the data with one observation on one line
-	display "Stacking the observations"
-	stack	v1 v2 v3 v4  v5  v6  v7  v8	 ///
-			v1 v2 v3 v9  v10 v11 v12 v13 ///
-			v1 v2 v3 v14 v15 v16 v17 v18 ///
-			v1 v2 v3 v19 v20 v21 v22 v23 ///
-			v1 v2 v3 v24 v25 v26 v27 v28 ///
-			v1 v2 v3 v29 v30 v31 v32 v33 ///
-			v1 v2 v3 v34 v35 v36 v37 v38 ///
-			v1 v2 v3 v39 v40 v41 v42 v43 ///
-			, into(v1 v2 v3 v4 v5 v6 v7 v8) clear
-	display "Dropping empty observations from the stacking"
-	drop if v7 == . | v8 == .
-	drop _stack
+    qui {
+        insheet using $subway_oldtext_dir/`file', clear
 
-	compress
+        *This is a special case that deals with extra text
+        *at the beginning of the 7/14/2012 data file
+        if "`file'" == "turnstile_120714.txt" {
+            display "Dropping the first ten observations"
+            drop in 1/10
+            destring v7 v8 v12 v13 v17 v18 v22 v23 v27 v28 v32 v33 v37 v38 v42 v43, replace
+        }
+        
+        *The end of the 8/25/2012 data file has an odd line at the end with "USE",
+        *whose formatting doesn't fit with the other lines. This deletes the last line.
+        if "`file'" == "turnstile_120825.txt" {
+            local obs_total = _N
+            display "Dropping the last observation"
+            drop in `obs_total'
+        }
+        
+        *In turnstile_120505.txt, there is one value of just a hyphen in v43
+        *This will make sure all of the entries and exits are numeric format,
+        *as long as there are no other characters besides hyphen in those fields.
+        *This has to be done before the stacking; otherwise, data is lost and set to missing.
+        destring v7 v8 v12 v13 v17 v18 v22 v23 v27 v28 v32 v33 v37 v38 v42 v43, replace ignore("-")
+        
+        *Organize the data with one observation on one line
+        display "Stacking the observations"
+        stack	v1 v2 v3 v4  v5  v6  v7  v8	 ///
+                v1 v2 v3 v9  v10 v11 v12 v13 ///
+                v1 v2 v3 v14 v15 v16 v17 v18 ///
+                v1 v2 v3 v19 v20 v21 v22 v23 ///
+                v1 v2 v3 v24 v25 v26 v27 v28 ///
+                v1 v2 v3 v29 v30 v31 v32 v33 ///
+                v1 v2 v3 v34 v35 v36 v37 v38 ///
+                v1 v2 v3 v39 v40 v41 v42 v43 ///
+                , into(v1 v2 v3 v4 v5 v6 v7 v8) clear
+        display "Dropping empty observations from the stacking"
+        drop if v7 == . | v8 == .
+        drop _stack
+
+        compress
+
+    }
 	
-	save "`file'.dta", replace
+	save "$subway_weekly_dir/`file'.dta", replace
 }
-
-
-*Create a directory for the text data files and move them there
-mkdir text_data_files
-*This shell command only works in Windows
-shell move *.txt .\text_data_files
 
 *Append all the weekly datasets together.  
 clear
-local datafiles : dir . files  "*.txt.dta"
-append using `datafiles'
 
-*Create a directory for the Stata data files and move them there
-mkdir weekly_data_files
-shell move *.txt.dta .\weekly_data_files
+local datafiles : dir "$subway_weekly_dir" files  "*.txt.dta"
+assert strlen(`" `datafiles' "') != 0
+
+foreach file in `datafiles' {
+   local datafiles_fullpath $subway_weekly_dir/`file' `datafiles_fullpath'
+}
+
+append using `datafiles_fullpath'
 
 *Rename the variables
 rename v1 booth
@@ -170,11 +114,26 @@ drop time_master
 *STATION NAMES
 
 *Merge in the station names and other info from the modified station crosswalk
-	*Bring in only the station-line combination and not the parts
-merge m:1 remote using station_crosswalk, keepusing(division station_line)
+*Bring in only the station-line combination and not the parts
+merge m:1 remote using "$subway_raw/station_crosswalk.dta", keepusing(division station)
+
 *Drop the handful of odd cases that don't match 
-drop if _merge == 1
+replace station = "45 RD-COURT H S" if _merge==1
+
+//drop if _merge == 1		//Drops One Station at R508 - instead I replaced the name
+drop if _merge == 2		//Drops stations with no data
+drop _merge
+
+*STATION LAT/LONG
+
+*Merge in station names, and lat/long
+mmerge remote using "$subway_raw/station_latlong.dta"
+
+replace lat_deg=40.747615 if _merge==1
+replace long_deg=-73.945069 if _merge==1
+
 drop if _merge == 2
+
 drop _merge
 
 *Drop divisions that aren't part of the subway system, then remove the division variable
@@ -196,24 +155,21 @@ label variable dayofweek "Day of the Week"
 label variable weekday "Weekday"
 label define weekday 1 "Weekday" 0 "Weekend"
 
-save data_master, replace
+save "$subway_raw/data_master.dta", replace
 
 
-
+use "$subway_raw/data_master.dta", clear
 
 ***DATA CLEANING AND PREPARATION FOR ANALYSIS***
 
-
-
-
 **THIS SECTION CREATES A DAYLIGHT SAVINGS TIME DUMMY VARIABLE
-	*A knowledge of the Daylight Savings Time dates is crucial to working with this dataset
+*A knowledge of the Daylight Savings Time dates is crucial to working with this dataset
 
 *Here are the dates when DST changes, with the Stata ('statadate' variable) equivalents
 
 	*To DST		statadate		From DST	statadate
 	*3/14/2010	18335			11/7/2010	18573
-	*3/13/2011	18699			11/6/2010	18937
+	*3/13/2011	18699			11/6/2011	18937
 	*3/11/2012	19063			11/4/2012	19301
 	*3/10/2013	19427			11/3/2013	19665
 	*3/9/2014	19791			11/2/2014	20029
@@ -236,24 +192,23 @@ label values DST DST
 *Create a unique identifier for each turnstile
 gen identifier = remote + " " + booth + " " + turnstile 
 label variable identifier "Turnstile Identifier"
-drop booth turnstile
+//drop booth turnstile
 order identifier, after(remote)
 
-
-
 ** THIS SECTION SPLITS OUT WALL ST STATION ON THE 4/5 TRAINS INTO A SEPARATE DATASET
-	*Almost all turnstiles report at four-hour cycles throughout the dataset.
-	*At Wall St-45, all of the turnstiles report hourly, and they are the only turnstiles to do so regularly, so they are treated differently in the code.
-	*There are two other turnstiles that had small stretches of reporting hourly, but they didn’t seem to be reporting anything useful.
-		*They are: Hunts Point Ave, R146 R412 00-02-00 and Smith-9 St, R270 N536 00-02-00 (same turnstile no. -- not a mistake)
+*Almost all turnstiles report at four-hour cycles throughout the dataset.
+*At Wall St-45, all of the turnstiles report hourly, and they are the only turnstiles to do so regularly, so they are treated differently in the code.
+*There are two other turnstiles that had small stretches of reporting hourly, but they didn’t seem to be reporting anything useful.
+*They are: Hunts Point Ave, R146 R412 00-02-00 and Smith-9 St, R270 N536 00-02-00 (same turnstile no. -- not a mistake)
 
 		
-save DST_turnstile
+save "$subway_raw/DST_turnstile.dta", replace
 
 keep if station == "WALL ST-45"
-save Wall_St_45
+save "$subway_raw/Wall_St_45.dta", replace
 
-use DST_turnstile
+use "$subway_raw/DST_turnstile.dta", clear
+
 drop if station == "WALL ST-45"
 
 
@@ -264,9 +219,9 @@ drop if station == "WALL ST-45"
 
 *This process is designed for capturing four-hour time blocks.
 *If daily totals are desired, possible approaches include: 
-	*differencing from the last scheduled reporting time of the day to the same time the previous day
-	*differencing at the four-hour level, as below, then summing the differences if all six daily four-hour blocks are accounted for
-	*The first method is probably best, so one missed report doesn't necessarily remove the whole day from consideration for a given turnstile.
+*differencing from the last scheduled reporting time of the day to the same time the previous day
+*differencing at the four-hour level, as below, then summing the differences if all six daily four-hour blocks are accounted for
+*The first method is probably best, so one missed report doesn't necessarily remove the whole day from consideration for a given turnstile.
 
 *Keep only those observations that occur on the hour
 keep if mod(statatime, 3600000) == 0
@@ -274,7 +229,7 @@ keep if mod(statatime, 3600000) == 0
 *Create and sort by a heirarchy of transaction codes (for time duplicates)
 *This is based on the frequency with which these codes appear in the data as well as our limited knowledge of the meaning of the codes.
 *There are other codes, such as DOOR OPEN, DOOR CLOSE, and LOGON, that are less frequent and used for maintenance.
-	*Only the most frequent seven are listed here.
+*Only the most frequent seven are listed here.
 
 
 gen byte trans_srt =	cond(transaction == "REGULAR", 		1,			///		92.2% of transactions that occur on exact hours		
@@ -285,7 +240,7 @@ gen byte trans_srt =	cond(transaction == "REGULAR", 		1,			///		92.2% of transac
 						cond(transaction == "DOOR", 		6,			///		0.4%		
 						cond(transaction == "OPN", 			7, .)))))))	//		0.1%		
 *Note: After eliminating duplicates using the steps below, the percentages are 96.3, 0.3, and 0.3 for the first three and the same for the others.
-	*This suggests that most of the RECOVR AUD and RECOVR transactions occur in tandem with REGULAR transactions, while the other transactions typically do not.
+*This suggests that most of the RECOVR AUD and RECOVR transactions occur in tandem with REGULAR transactions, while the other transactions typically do not.
 
 sort identifier statadate statatime trans_srt
 drop trans_srt
@@ -315,8 +270,8 @@ replace after_switch = 1 if statadate[_n] == statadate[_n-1] & statatime[_n-1] >
 gen byte before_switch = 0
 replace before_switch = 1 if statadate[_n] - statadate[_n-1] == 1 & statatime[_n] < 7200000 & dst_switch == 1	///
 	& identifier[_n] == identifier[_n-1]
-	*Some 1:00 AM observations on "Fall Back" days all are, in fact, after the switch (2:00 AM goes back to 1:00 AM), 
-		*but this will allow the ones that are before the switch (normal) to be counted as normal.
+*Some 1:00 AM observations on "Fall Back" days all are, in fact, after the switch (2:00 AM goes back to 1:00 AM), 
+*but this will allow the ones that are before the switch (normal) to be counted as normal.
 
 *Identify four-hour intervals that are not affected by DST switches
 gen byte four_hr_int = 0
@@ -349,8 +304,8 @@ replace four_hr_int = 1 if (																									///
 
 
 *Repeat to search for four-hour intervals two records apart in case there's an oddball hourly reading in between
-	*Repeating for [_n-3] just seems to bring up a small number of fluke readings
-	*Repeating for [_n-4] only captures Wall St-45 due to its hourly readings. The station is being processed differently in a different data file.
+*Repeating for [_n-3] just seems to bring up a small number of fluke readings
+*Repeating for [_n-4] only captures Wall St-45 due to its hourly readings. The station is being processed differently in a different data file.
 
 gen four_hr_int_gap = 0
 replace four_hr_int_gap = 1 if (																								///
@@ -384,40 +339,36 @@ drop if diff_exits < 0
 
 *Check for outliers / false readings that haven't been deleted
 *After spot-checking a few stations, including Times Square, 6000 seems to be a good number.
-	*6000 per four hours = 25 / min. (at one SCP, which may be more than one turnstile)
+*6000 per four hours = 25 / min. (at one SCP, which may be more than one turnstile)
 *Alternatively, multiples of Interquartile Ranges or Median Absolute Deviation for each station (and perhaps weekday / weekend) could be used,
-	*but this data has a lot of variation and spikes, for example due to holidays, so cutting too agressively across the board is risky.
-	*It may be better to leave in all observations that aren't clearly false and then use medians in the analysis. That's what this method does.
+*but this data has a lot of variation and spikes, for example due to holidays, so cutting too agressively across the board is risky.
+*It may be better to leave in all observations that aren't clearly false and then use medians in the analysis. That's what this method does.
 
 	
 *Another possible approach is to find the false readings by the activity around them. There are sometimes instances of the entries and/or exits count jumping 
-	*around, with large, obviously false, movements in both directions of the entries_master and exits_master counts. It seems that this might be primarily when
-	*maintenance is performed on a turnstile. It might be possible before any observations are dropped (including the observations between hours) to identify the
-	*pairs or small groups of the entries_master and exits_master movements. The movements are often equivalent in size but opposite in sign, or may be close in size
-	*but not exact. Such a cleaning method would have to create differences early solely for this purpose, then evaluate the fluctuations, for example, by looking for 
-	*a negative difference and a partnering positive difference within about 10% of the value of the negative difference.
+*around, with large, obviously false, movements in both directions of the entries_master and exits_master counts. It seems that this might be primarily when
+*maintenance is performed on a turnstile. It might be possible before any observations are dropped (including the observations between hours) to identify the
+*pairs or small groups of the entries_master and exits_master movements. The movements are often equivalent in size but opposite in sign, or may be close in size
+*but not exact. Such a cleaning method would have to create differences early solely for this purpose, then evaluate the fluctuations, for example, by looking for 
+*a negative difference and a partnering positive difference within about 10% of the value of the negative difference.
 	
 drop if diff_entries > 6000
 drop if diff_exits > 6000
 
-
 *Save the cleaned and prepared dataset and erase the intermediary file DST_turnstile
-save data_prepared
-erase DST_turnstile.dta
+save "$subway_raw/data_prepared.dta", replace
 
-
-
-
+erase "$subway_raw/DST_turnstile.dta"
 
 
 ***WALL ST-45 CLEANING AND PREPARATION
-	*Almost all turnstiles report at four-hour cycles throughout the dataset.
-	*At Wall St-45, all of the turnstiles report hourly, and they are the only turnstiles to do so regularly, so they are treated differently in the code.
-	*There are two other turnstiles that had small stretches of reporting hourly, but they didn’t seem to be reporting anything useful.
-		*They are: Hunts Point Ave, R146 R412 00-02-00 and Smith-9 St, R270 N536 00-02-00 (same turnstile no. -- not a mistake)
+*Almost all turnstiles report at four-hour cycles throughout the dataset.
+*At Wall St-45, all of the turnstiles report hourly, and they are the only turnstiles to do so regularly, so they are treated differently in the code.
+*There are two other turnstiles that had small stretches of reporting hourly, but they didn’t seem to be reporting anything useful.
+*They are: Hunts Point Ave, R146 R412 00-02-00 and Smith-9 St, R270 N536 00-02-00 (same turnstile no. -- not a mistake)
 
 
-use Wall_St_45
+use "$subway_raw/Wall_St_45.dta", clear
 
 
 
@@ -443,11 +394,16 @@ replace dst_end = 1 if (statadate == 18573 | statadate == 18937 | statadate == 1
 keep if mod(statatime, 3600000) == 0
 
 
+*Keep only the places on 4 hour intervals 0,4,8,12,16,20
+keep if statatime==tc(01jan1960 0:00:00) | statatime==tc(01jan1960 4:00:00) | statatime==tc(01jan1960 8:00:00) | statatime==tc(01jan1960 12:00:00) ///
+		| statatime==tc(01jan1960 16:00:00) | statatime==tc(01jan1960 20:00:00)
+
+
 
 *Create and sort by a heirarchy of transaction codes (for time duplicates)
 *This is based on the frequency with which these codes appear in the data as well as our limited knowledge of the meaning of the codes.
 *There are other codes, such as DOOR OPEN, DOOR CLOSE, and LOGON, that are less frequent and used for maintenance.
-	*Only the most frequent seven are listed here.
+*Only the most frequent seven are listed here.
 
 gen byte trans_srt =	cond(transaction == "REGULAR", 		1,			///		97.3% of transactions that occur on exact hours		
 						cond(transaction == "RECOVR AUD", 	2,			///		0.9%		
@@ -457,29 +413,25 @@ gen byte trans_srt =	cond(transaction == "REGULAR", 		1,			///		97.3% of transac
 						cond(transaction == "DOOR", 		6,			///		0.1%		
 						cond(transaction == "OPN", 			7, .)))))))	//		0.1%		
 *Note: After eliminating duplicates using the steps below, the percentages are 98.5, 0.2, 0.3, and 0.6 for the first four and the same for the others.
-	*This suggests that many of the RECOVR AUD, RECOVR, and AUD transactions occur in tandem with REGULAR transactions, while the other transactions typically do not.
+*This suggests that many of the RECOVR AUD, RECOVR, and AUD transactions occur in tandem with REGULAR transactions, while the other transactions typically do not.
 
 
 *Prioritize observations by transaction code.
-	*When DST ends, there are usually two 1:00 AM records. (1:00 AM occurs naturally, then 2:00 AM becomes 1:00 AM again.)
-		*This code assumes the higher reading is the later one, and the one to use for differencing 1:00 to 2:00 AM.
+*When DST ends, there are usually two 1:00 AM records. (1:00 AM occurs naturally, then 2:00 AM becomes 1:00 AM again.)
+*This code assumes the higher reading is the later one, and the one to use for differencing 1:00 to 2:00 AM.
 sort identifier statadate statatime trans_srt entries_master exits_master
 drop trans_srt
 
 *Delete duplicate times, keeping the observation with the highest transaction hierarchy
 by identifier statadate: drop if statatime[_n] == statatime[_n-1] & (dst_end == 0 | (dst_end == 1 & statatime != 3600000))
-	
-	
 
 **THIS SECTION IDENTIFIES ONE-HOUR INTERVALS BETWEEN OBSERVATIONS, TAKING INTO ACCOUNT DAYLIGHT SAVINGS TIME, AND DIFFERENCES ENTRIES AND EXITS
 	
-	
-	*To compare this station with others, the user may want to create four-hour blocks out of this data.
-	*To create four-hour blocks, two options are to 1) difference the one-hour blocks and aggregate 
-		*2) difference four-hour blocks, based on decisions about how to define those blocks (see annotations in the "ratios" DO file)
-	*Option 1) is used below. If aggregating from one-hour blocks, the user should be careful only to include those blocks
-		*where all four one-hour blocks are present, that is, not to aggregate three one-hour blocks together and call it a four-hour block.
-
+*To compare this station with others, the user may want to create four-hour blocks out of this data.
+*To create four-hour blocks, two options are to 1) difference the one-hour blocks and aggregate 
+*2) difference four-hour blocks, based on decisions about how to define those blocks (see annotations in the "ratios" DO file)
+*Option 1) is used below. If aggregating from one-hour blocks, the user should be careful only to include those blocks
+*where all four one-hour blocks are present, that is, not to aggregate three one-hour blocks together and call it a four-hour block.
 
 *Indicate dates when DST status changes
 gen byte dst_switch = 0
@@ -499,8 +451,8 @@ replace before_switch = 1 if statatime[_n] < 7200000 & dst_begin[_n] == 1 & iden
 
 *Indicate when the interval occurs before 1:00 AM on a "Fall Back" Day
 replace before_switch = 1 if statatime[_n] < 3600000 & dst_end[_n] == 1	& identifier[_n] == identifier[_n-1]	
-	*Since the Wall St-45 is an hourly dataset, there are two instances of 1:00 AM observations on "Fall Back" days.
-		*Those observations are treated separately.
+*Since the Wall St-45 is an hourly dataset, there are two instances of 1:00 AM observations on "Fall Back" days.
+*Those observations are treated separately.
 
 		
 *Identify one-hour intervals that are not affected by DST switches
@@ -533,18 +485,19 @@ replace one_hr_int = 1 if (																										///
 		) 																														///
 	&	identifier[_n] == identifier[_n-1]																						///
 )
-	*Both instances of 1:00 AM are captured by this method. 
-	*Note that this method assumes that the higher of the readings (by entries_master first, then exits_master) is the later one.
-		*It may be possible to avoid this assumption by flagging the order of the 1:00 instances as they exist in the raw data files, 
-			*before any re-sorting or stacking of the data is done.
-	*If analysis is performed using early morning times, the user should be careful about the extra instances of 1:00 AM.
-		*If needed, a standardized time variable, such as GMT, could be created based on the given times, 
-			*DST status (being careful of early morning switches), and the assumption about the 1:00 AM observations mentioned above.
+
+*Both instances of 1:00 AM are captured by this method. 
+*Note that this method assumes that the higher of the readings (by entries_master first, then exits_master) is the later one.
+*It may be possible to avoid this assumption by flagging the order of the 1:00 instances as they exist in the raw data files, 
+*before any re-sorting or stacking of the data is done.
+*If analysis is performed using early morning times, the user should be careful about the extra instances of 1:00 AM.
+*If needed, a standardized time variable, such as GMT, could be created based on the given times, 
+*DST status (being careful of early morning switches), and the assumption about the 1:00 AM observations mentioned above.
 
 
 *Difference the entries and exits. These will become the key variables in the dataset.
-gen diff_entries = entries[_n] - entries[_n-1] if identifier[_n] == identifier[_n-1] & one_hr_int == 1
-gen diff_exits = exits[_n] - exits[_n-1] if identifier[_n] == identifier[_n-1] & one_hr_int == 1
+gen diff_entries = entries[_n] - entries[_n-1] if identifier[_n] == identifier[_n-1] //& one_hr_int == 1
+gen diff_exits = exits[_n] - exits[_n-1] if identifier[_n] == identifier[_n-1] //& one_hr_int == 1
 
 label variable diff_entries "Entries"
 label variable diff_exits "Exits"
@@ -560,13 +513,13 @@ drop if diff_entries < 0
 drop if diff_exits < 0
 
 *Check for outliers / false readings that haven't been deleted
-	*The cut-off value is based on looking at the dataset (see the notes below) and the cut-off value for the four-hour blocks, 6000.
-	*(6000 / 4 = 1500)
+*The cut-off value is based on looking at the dataset (see the notes below) and the cut-off value for the four-hour blocks, 6000.
+*(6000 / 4 = 1500)
 drop if diff_entries > 1500		//	Readings go up to 786, then jump up to one clearly false reading of 1.8 million
 drop if diff_exits > 1500		//	Readings go up to 1195, then jump up to 3364 in the same record as the diff_entries of 1.8 million
 
 
 *Save the cleaned and prepared dataset and erase the intermediary file Wall_St-45
-save Wall_St_45_prepared
-erase Wall_St_45.dta
+save "$subway_raw/Wall_St_45_prepared.dta", replace
 
+erase "$subway_raw/Wall_St_45.dta"
